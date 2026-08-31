@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banana Patterns — Fresh Breakouts Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#131924; --panel2:#1a2230; --border:#263042;
+    --text:#e6ecf3; --muted:#8ea0b8; --accent:#4fd1a5; --accent2:#5b9dff;
+    --warn:#f5a623; --danger:#ff5d6c; --good:#4fd1a5;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:14px 12px 60px;}
+  h1{font-size:1.25rem;margin:6px 0 2px;}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:16px;}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;}
+
+  /* Upload */
+  .upload-box{
+    border:2px dashed var(--border); border-radius:var(--radius);
+    padding:26px 14px; text-align:center; cursor:pointer;
+    transition:border-color .15s;
+  }
+  .upload-box:active, .upload-box.drag{border-color:var(--accent2);}
+  .upload-box input{display:none;}
+  .upload-btn{
+    display:inline-block; margin-top:10px; padding:12px 22px;
+    background:var(--accent2); color:#fff; border-radius:10px;
+    font-size:1rem; font-weight:600; min-height:44px;
+  }
+  .fname{margin-top:8px;color:var(--muted);font-size:.85rem;word-break:break-all;}
+
+  /* Config row */
+  .cfg{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  .cfg label{font-size:.8rem;color:var(--muted);display:block;margin-bottom:4px;}
+  .cfg select, .cfg input[type=text]{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:10px;border-radius:8px;font-size:.9rem;min-height:40px;width:100%;
+  }
+  .cfg .field{flex:1 1 140px;min-width:120px;}
+
+  /* Summary stat chips */
+  .stats{display:flex;flex-wrap:wrap;gap:8px;}
+  .stat{
+    flex:1 1 45%; background:var(--panel2); border:1px solid var(--border);
+    border-radius:10px; padding:10px; text-align:center;
+  }
+  @media (min-width:640px){
+    .stats{flex-wrap:nowrap;}
+    .stat{flex:1 1 0;}
+  }
+  .stat .n{font-size:1.3rem;font-weight:700;}
+  .stat .l{font-size:.7rem;color:var(--muted);margin-top:2px;}
+
+  /* Table */
+  .table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:10px;}
+  table{border-collapse:collapse;width:100%;min-width:820px;font-size:.82rem;}
+  th,td{padding:9px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
+  th{background:var(--panel2);position:sticky;top:0;cursor:pointer;user-select:none;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;}
+  th.sorted{color:var(--accent);}
+  tbody tr:active{background:#182231;}
+  td.sym{font-weight:700;color:var(--text);}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .score-cell{font-weight:700;}
+  .badge{
+    display:inline-block;padding:2px 7px;border-radius:6px;font-size:.68rem;
+    font-weight:600;margin:1px 2px 1px 0;white-space:nowrap;
+  }
+  .b-extended{background:rgba(255,93,108,.18);color:var(--danger);}
+  .b-weak{background:rgba(245,166,35,.18);color:var(--warn);}
+  .b-old{background:rgba(139,160,184,.18);color:var(--muted);}
+  .b-supply{background:rgba(255,93,108,.18);color:var(--danger);}
+  .b-rsjump{background:rgba(91,157,255,.18);color:var(--accent2);}
+  .b-lowvol{background:rgba(245,166,35,.18);color:var(--warn);}
+  .b-clean{background:rgba(79,209,165,.18);color:var(--good);}
+
+  /* card list for narrow screens (alt view) */
+  .cards{display:none;flex-direction:column;gap:10px;}
+  .pcard{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .pcard .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .pcard .sym{font-weight:700;font-size:1.05rem;}
+  .pcard .score{font-size:1.2rem;font-weight:800;}
+  .pcard .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:.78rem;color:var(--muted);margin-top:6px;}
+  .pcard .grid b{color:var(--text);font-weight:600;}
+
+  .toggle-view{display:flex;gap:6px;margin-bottom:10px;}
+  .toggle-view button{
+    flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);
+    background:var(--panel2);color:var(--muted);font-size:.82rem;font-weight:600;min-height:40px;
+  }
+  .toggle-view button.active{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+
+  .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:.9rem;}
+  .err{color:var(--danger);background:rgba(255,93,108,.1);border:1px solid rgba(255,93,108,.3);padding:10px;border-radius:8px;font-size:.82rem;margin-top:10px;}
+
+  .legend{font-size:.72rem;color:var(--muted);line-height:1.6;margin-top:10px;}
+  .legend b{color:var(--text);}
+
+  /* Confidence pills */
+  .conf{display:inline-block;padding:3px 9px;border-radius:6px;font-size:.7rem;font-weight:700;white-space:nowrap;}
+  .conf-high{background:rgba(79,209,165,.18);color:var(--good);}
+  .conf-med{background:rgba(245,166,35,.18);color:var(--warn);}
+  .conf-low{background:rgba(255,93,108,.18);color:var(--danger);}
+
+  /* Top 5 to Watch panel */
+  .watch-panel{background:linear-gradient(180deg,rgba(91,157,255,.08),rgba(91,157,255,0));border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;}
+  .watch-title{font-size:.95rem;font-weight:700;margin-bottom:2px;}
+  .watch-sub{font-size:.75rem;color:var(--muted);margin-bottom:10px;}
+  .watch-list{display:flex;flex-direction:column;gap:8px;}
+  .watch-item{
+    display:flex;align-items:center;gap:10px;background:var(--panel2);
+    border:1px solid var(--border);border-radius:10px;padding:10px 12px;
+  }
+  .watch-rank{
+    flex:0 0 26px;height:26px;border-radius:50%;background:var(--panel);
+    display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;color:var(--muted);
+  }
+  .watch-main{flex:1;min-width:0;}
+  .watch-sym{font-weight:700;font-size:.95rem;}
+  .watch-flag{font-size:.72rem;color:var(--muted);margin-top:2px;}
+  .watch-right{flex:0 0 auto;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+  .watch-score{font-weight:700;font-size:1rem;}
+  .watch-note{font-size:.78rem;color:var(--warn);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);padding:8px 10px;border-radius:8px;margin-bottom:10px;}
+  .watch-empty{color:var(--muted);font-size:.85rem;text-align:center;padding:20px 10px;}
+
+  @media (min-width:640px){
+    .cards{display:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🍌 Banana Patterns — Fresh Breakouts Dashboard</h1>
+  <div class="sub">Upload your scanner export (CSV/XLSX) to auto-score and flag fresh breakouts.</div>
+
+  <div class="card">
+    <label class="upload-box" id="uploadBox">
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+      <div>📁 Tap to select your Excel/CSV export</div>
+      <div class="upload-btn">Choose File</div>
+      <div class="fname" id="fname">No file selected</div>
+    </label>
+    <div id="err"></div>
+  </div>
+
+  <div class="card" id="mapCard" style="display:none;">
+    <div class="sub" style="margin-bottom:8px;">Map your columns (auto-detected — adjust if needed)</div>
+    <div class="cfg" id="mapFields"></div>
+  </div>
+
+  <div class="card" id="statsCard" style="display:none;">
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <div class="toggle-view">
+      <button id="btnWatch">🎯 Watchlist</button>
+      <button id="btnTable" class="active">📊 Table</button>
+      <button id="btnCards">🗂 Cards</button>
+    </div>
+    <div class="watch-panel" id="watchPanel" style="display:none;">
+      <div class="watch-title">🎯 Top 5 to Watch</div>
+      <div class="watch-sub">Strict shortlist: High confidence, zero flags, extension ≤8% only. Not top-5-by-score.</div>
+      <div class="watch-note" id="watchNote" style="display:none;"></div>
+      <div class="watch-list" id="watchList"></div>
+    </div>
+    <div class="table-scroll">
+      <table id="resTable">
+        <thead><tr id="theadRow"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="cards" id="cardsView"></div>
+    <div class="legend">
+      <b>Score</b> ≈ 0.5×RS − 0.5×Extension% + 0.25×(Close-in-Range×100) − 0.3×OverheadSupply% + 0.15×RS-avg-in-base.
+      Flags: <b>Extended</b> (&gt;10% past pivot) · <b>Weak close</b> (CIR&lt;0.6) · <b>Old base</b> (&gt;30wks) ·
+      <b>Heavy supply</b> (&gt;20%) · <b>RS jumped late</b> (RS−RSavg&gt;30) · <b>Low volume</b> (&lt;1x avg) ·
+      <b>Squat</b> / <b>Failed poke</b> (manual, if mapped — same severity as Old base/Heavy supply)<br>
+      <b>Confidence</b> is a rules-based heuristic (score + flag severity combined) — not a backtested win-rate or statistical probability.
+    </div>
+  </div>
+
+  <div class="empty" id="emptyMsg">Upload a file to get started. Expected columns (any order/name):
+  Symbol, RS Rating, Close-in-Range (0–1), RS Avg in Base, Overhead Supply %, Extension % past Pivot, Breakout Volume (x avg), Base Age (weeks).</div>
+</div>
+
+<script>
+(function(){
+  const fileInput = document.getElementById('fileInput');
+  const uploadBox = document.getElementById('uploadBox');
+  const fname = document.getElementById('fname');
+  const errBox = document.getElementById('err');
+  const mapCard = document.getElementById('mapCard');
+  const mapFields = document.getElementById('mapFields');
+  const statsCard = document.getElementById('statsCard');
+  const statsEl = document.getElementById('stats');
+  const resultsCard = document.getElementById('resultsCard');
+  const theadRow = document.getElementById('theadRow');
+  const tbody = document.getElementById('tbody');
+  const cardsView = document.getElementById('cardsView');
+  const emptyMsg = document.getElementById('emptyMsg');
+  const btnWatch = document.getElementById('btnWatch');
+  const btnTable = document.getElementById('btnTable');
+  const btnCards = document.getElementById('btnCards');
+  const watchPanel = document.getElementById('watchPanel');
+  const watchList = document.getElementById('watchList');
+  const watchNote = document.getElementById('watchNote');
+
+  let rawRows = [], headers = [], mapping = {}, scored = [];
+  let sortKey = 'score', sortDir = -1;
+
+  // Field definitions: key -> [label, list of likely header matches]
+  const FIELDS = {
+    symbol:  ['Symbol', /symbol|ticker|stock/i],
+    rs:      ['RS Rating', /^rs.?rating$|rs rating/i],
+    cir:     ['Close-in-Range', /close.?in.?range|cir/i],
+    rsavg:   ['RS Avg in Base', /rs.?avg.*base|avg.?rs|rs,?\s*average\s*in\s*base/i],
+    supply:  ['Overhead Supply %', /overhead|supply/i],
+    ext:     ['Extension % past Pivot', /extension|past.?pivot|ext.?%|now\s*vs\s*pivot/i],
+    vol:     ['Breakout Vol (x avg)', /volume|vol.*x|breakout.?vol/i],
+    baseage: ['Base Age (wks)', /base.?age|weeks.?in.?base/i],
+    squat:   ['Squat', /squat/i],
+    failedpoke: ['Failed Poke', /failed.?poke|fail.?poke/i]
+  };
+
+  uploadBox.addEventListener('click', (e)=>{ if(e.target.tagName!=='INPUT'){ fileInput.click(); } });
+  fileInput.addEventListener('change', handleFile);
+
+  function handleFile(e){
+    const f = e.target.files[0];
+    if(!f) return;
+    fname.textContent = f.name;
+    errBox.innerHTML = '';
+    const ext = f.name.split('.').pop().toLowerCase();
+    if(ext === 'csv'){
+      Papa.parse(f, {
+        header:true, skipEmptyLines:true, dynamicTyping:false,
+        complete: (res)=> ingest(res.data, res.meta.fields),
+        error: (err)=> showErr('CSV parse error: '+err.message)
+      });
+    } else if(ext === 'xlsx' || ext === 'xls'){
+      const reader = new FileReader();
+      reader.onload = function(evt){
+        try{
+          const wb = XLSX.read(evt.target.result, {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(ws, {defval:''});
+          const cols = json.length ? Object.keys(json[0]) : [];
+          ingest(json, cols);
+        }catch(err){ showErr('Excel parse error: '+err.message); }
+      };
+      reader.onerror = ()=> showErr('Could not read file.');
+      reader.readAsArrayBuffer(f);
+    } else {
+      showErr('Unsupported file type. Please upload .csv, .xlsx, or .xls');
+    }
+  }
+
+  function showErr(msg){
+    errBox.innerHTML = '<div class="err">⚠️ '+msg+'</div>';
+  }
+
+  function ingest(rows, cols){
+    if(!rows || !rows.length){ showErr('No rows found in file.'); return; }
+    rawRows = rows.filter(r=>Object.values(r).some(v=>String(v).trim()!==''));
+    headers = cols || Object.keys(rawRows[0]);
+    autoMap();
+    renderMapUI();
+    computeAndRender();
+  }
+
+  function autoMap(){
+    mapping = {};
+    Object.keys(FIELDS).forEach(key=>{
+      const [,pattern] = FIELDS[key];
+      let found = headers.find(h=> pattern.test(h.trim()));
+      mapping[key] = found || '';
+    });
+  }
+
+  function renderMapUI(){
+    mapCard.style.display = 'block';
+    mapFields.innerHTML = '';
+    Object.keys(FIELDS).forEach(key=>{
+      const [label] = FIELDS[key];
+      const div = document.createElement('div');
+      div.className = 'field';
+      const sel = document.createElement('select');
+      sel.id = 'map_'+key;
+      const noneOpt = document.createElement('option');
+      noneOpt.value=''; noneOpt.textContent='(none)';
+      sel.appendChild(noneOpt);
+      headers.forEach(h=>{
+        const o = document.createElement('option');
+        o.value = h; o.textContent = h;
+        if(h === mapping[key]) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', ()=>{ mapping[key]=sel.value; computeAndRender(); });
+      div.innerHTML = '<label>'+label+'</label>';
+      div.appendChild(sel);
+      mapFields.appendChild(div);
+    });
+  }
+
+  const FLAG_PRIORITY = ['Squat','Failed poke','Old base','Heavy supply','RS jumped late','Weak close','Low volume','Extended'];
+  const SEVERE_FLAGS = ['Old base','Heavy supply','RS jumped late','Squat','Failed poke'];
+
+  function computeConfidence(score, flags){
+    const names = flags.map(f=>f[0]);
+    const hasSevere = names.some(n=> SEVERE_FLAGS.includes(n));
+    if(score < 60 || flags.length >= 2 || hasSevere) return 'Low';
+    if(score > 75 && (flags.length === 0 || (flags.length === 1 && names[0] === 'Extended'))) return 'High';
+    if((score >= 60 && score <= 75) || (flags.length === 1 && ['Weak close','Low volume'].includes(names[0]))) return 'Medium';
+    return 'Low';
+  }
+
+  function topFlagFor(s){
+    if(!s.flags.length) return null;
+    const sorted = [...s.flags].sort((a,b)=> FLAG_PRIORITY.indexOf(a[0]) - FLAG_PRIORITY.indexOf(b[0]));
+    return sorted[0];
+  }
+
+  function confPill(tier){
+    const cls = tier==='High' ? 'conf-high' : tier==='Medium' ? 'conf-med' : 'conf-low';
+    return `<span class="conf ${cls}">${tier}</span>`;
+  }
+
+  function num(v){
+    if(v === '' || v === null || v === undefined) return NaN;
+    const n = parseFloat(String(v).replace(/[%,]/g,''));
+    return isNaN(n) ? NaN : n;
+  }
+
+  function boolVal(v){
+    if(v === '' || v === null || v === undefined) return false;
+    const s = String(v).trim().toLowerCase();
+    return s === 'true' || s === 'yes' || s === 'y' || s === '1';
+  }
+
+  function computeAndRender(){
+    if(!mapping.symbol){ return; }
+    scored = rawRows.map(r=>{
+      const symbol = r[mapping.symbol];
+      const rs      = num(r[mapping.rs]);
+      let cir       = num(r[mapping.cir]);
+      if(!isNaN(cir) && cir>1) cir = cir/100; // handle 0-100 vs 0-1 input
+      const rsavg   = num(r[mapping.rsavg]);
+      const supply  = num(r[mapping.supply]);
+      const ext     = num(r[mapping.ext]);
+      const vol     = num(r[mapping.vol]);
+      const baseage = num(r[mapping.baseage]);
+      const squat = mapping.squat ? boolVal(r[mapping.squat]) : null;
+      const failedpoke = mapping.failedpoke ? boolVal(r[mapping.failedpoke]) : null;
+
+      const score =
+          0.5  * (isNaN(rs) ? 0 : rs)
+        + 0.25 * (isNaN(cir) ? 0 : cir*100)
+        + 0.15 * (isNaN(rsavg) ? 0 : rsavg)
+        - 0.3  * (isNaN(supply) ? 0 : supply)
+        - 0.5  * (isNaN(ext) ? 0 : Math.max(0, ext - 8));
+
+      const flags = [];
+      if(!isNaN(ext) && ext > 10) flags.push(['Extended','b-extended']);
+      if(!isNaN(cir) && cir < 0.6) flags.push(['Weak close','b-weak']);
+      if(!isNaN(baseage) && baseage > 30) flags.push(['Old base','b-old']);
+      if(!isNaN(supply) && supply > 20) flags.push(['Heavy supply','b-supply']);
+      if(!isNaN(rs) && !isNaN(rsavg) && (rs-rsavg) > 30) flags.push(['RS jumped late','b-rsjump']);
+      if(!isNaN(vol) && vol < 1) flags.push(['Low volume','b-lowvol']);
+      if(squat === true) flags.push(['Squat','b-supply']);
+      if(failedpoke === true) flags.push(['Failed poke','b-supply']);
+
+      const confidence = computeConfidence(score, flags);
+
+      return {symbol, rs, cir, rsavg, supply, ext, vol, baseage, squat, failedpoke, score, flags, confidence};
+    }).filter(x=>x.symbol);
+
+    renderStats();
+    renderTable();
+    renderCards();
+    renderWatch();
+    resultsCard.style.display = 'block';
+    statsCard.style.display = 'flex';
+    emptyMsg.style.display = 'none';
+  }
+
+  function renderWatch(){
+    const qualifying = scored.filter(s=>
+      s.confidence === 'High' &&
+      (isNaN(s.ext) || s.ext <= 8) &&
+      s.flags.length === 0
+    ).sort((a,b)=> b.score - a.score);
+
+    const top5 = qualifying.slice(0,5);
+
+    if(top5.length < 5){
+      watchNote.style.display = 'block';
+      watchNote.textContent = `Only ${top5.length} stock${top5.length===1?'':'s'} met the strict Top 5 criteria today.`;
+    } else {
+      watchNote.style.display = 'none';
+    }
+
+    if(top5.length === 0){
+      watchList.innerHTML = `<div class="watch-empty">No stocks met the strict criteria (High confidence, zero flags, extension ≤8%) today.</div>`;
+      return;
+    }
+
+    watchList.innerHTML = top5.map((s,i)=>{
+      return `<div class="watch-item">
+        <div class="watch-rank">${i+1}</div>
+        <div class="watch-main">
+          <div class="watch-sym">${s.symbol}</div>
+          <div class="watch-flag">No flags</div>
+        </div>
+        <div class="watch-right">
+          <div class="watch-score">${fmt(s.score)}</div>
+          ${confPill(s.confidence)}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderStats(){
+    const total = scored.length;
+    const clean = scored.filter(s=>s.flags.length===0).length;
+    const highConf = scored.filter(s=>s.confidence==='High').length;
+    const avgScore = total ? (scored.reduce((a,s)=>a+s.score,0)/total) : 0;
+    const top = scored.length ? Math.max(...scored.map(s=>s.score)).toFixed(1) : '–';
+    statsEl.innerHTML = [
+      ['Total', total],
+      ['Clean setups', clean],
+      ['High confidence', highConf],
+      ['Avg score', avgScore.toFixed(1)],
+      ['Top score', top]
+    ].map(([l,n])=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+  }
+
+  const COLS = [
+    {key:'symbol', label:'Symbol'},
+    {key:'score', label:'Score'},
+    {key:'confidence', label:'Confidence'},
+    {key:'rs', label:'RS'},
+    {key:'cir', label:'CIR'},
+    {key:'rsavg', label:'RS Avg'},
+    {key:'supply', label:'Supply%'},
+    {key:'ext', label:'Ext%'},
+    {key:'vol', label:'Vol x'},
+    {key:'baseage', label:'Base wk'},
+    {key:'flags', label:'Flags'}
+  ];
+
+  function sortData(){
+    scored.sort((a,b)=>{
+      let av = a[sortKey], bv = b[sortKey];
+      if(sortKey==='symbol') return sortDir * String(av).localeCompare(String(bv));
+      if(sortKey==='flags') return sortDir * (a.flags.length - b.flags.length);
+      if(sortKey==='confidence'){
+        const rank = {High:2, Medium:1, Low:0};
+        return sortDir * (rank[av] - rank[bv]);
+      }
+      av = isNaN(av) ? -Infinity : av; bv = isNaN(bv) ? -Infinity : bv;
+      return sortDir * (av - bv);
+    });
+  }
+
+  function fmt(v){ return (v===undefined || v===null || isNaN(v)) ? '–' : (Number.isInteger(v*10)? v.toFixed(1): v.toFixed(2)); }
+
+  function renderTable(){
+    sortData();
+    theadRow.innerHTML = COLS.map(c=>
+      `<th data-key="${c.key}" class="${sortKey===c.key?'sorted':''}">${c.label}${sortKey===c.key?(sortDir===1?' ▲':' ▼'):''}</th>`
+    ).join('');
+    theadRow.querySelectorAll('th').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const k = th.dataset.key;
+        if(sortKey===k) sortDir *= -1; else { sortKey=k; sortDir = (k==='symbol')?1:-1; }
+        renderTable();
+      });
+    });
+    tbody.innerHTML = scored.map(s=>{
+      const flagHtml = s.flags.length
+        ? s.flags.map(f=>`<span class="badge ${f[1]}">${f[0]}</span>`).join('')
+        : `<span class="badge b-clean">Clean</span>`;
+      return `<tr>
+        <td class="sym">${s.symbol}</td>
+        <td class="num score-cell">${fmt(s.score)}</td>
+        <td>${confPill(s.confidence)}</td>
+        <td class="num">${fmt(s.rs)}</td>
+        <td class="num">${isNaN(s.cir)?'–':s.cir.toFixed(2)}</td>
+        <td class="num">${fmt(s.rsavg)}</td>
+        <td class="num">${fmt(s.supply)}</td>
+        <td class="num">${fmt(s.ext)}</td>
+        <td class="num">${fmt(s.vol)}</td>
+        <td class="num">${fmt(s.baseage)}</td>
+        <td>${flagHtml}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderCards(){
+    cardsView.innerHTML = scored.map(s=>{
+      const flagHtml = s.flags.length
+        ? s.flags.map(f=>`<span class="badge ${f[1]}">${f[0]}</span>`).join('')
+        : `<span class="badge b-clean">Clean</span>`;
+      return `<div class="pcard">
+        <div class="top"><span class="sym">${s.symbol}</span><span class="score">${fmt(s.score)}</span></div>
+        <div style="margin-bottom:4px;">${confPill(s.confidence)}</div>
+        <div class="grid">
+          <div>RS: <b>${fmt(s.rs)}</b></div>
+          <div>CIR: <b>${isNaN(s.cir)?'–':s.cir.toFixed(2)}</b></div>
+          <div>RS Avg: <b>${fmt(s.rsavg)}</b></div>
+          <div>Supply%: <b>${fmt(s.supply)}</b></div>
+          <div>Ext%: <b>${fmt(s.ext)}</b></div>
+          <div>Vol x: <b>${fmt(s.vol)}</b></div>
+          <div>Base wk: <b>${fmt(s.baseage)}</b></div>
+        </div>
+        <div style="margin-top:8px;">${flagHtml}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function setTab(tab){
+    btnWatch.classList.toggle('active', tab==='watch');
+    btnTable.classList.toggle('active', tab==='table');
+    btnCards.classList.toggle('active', tab==='cards');
+    watchPanel.style.display = tab==='watch' ? 'block' : 'none';
+    document.querySelector('.table-scroll').style.display = tab==='table' ? 'block' : 'none';
+    cardsView.style.display = tab==='cards' ? 'flex' : 'none';
+  }
+  btnWatch.addEventListener('click', ()=> setTab('watch'));
+  btnTable.addEventListener('click', ()=> setTab('table'));
+  btnCards.addEventListener('click', ()=> setTab('cards'));
+  setTab('table');
+})();
+</script>
+</body>
+</html>

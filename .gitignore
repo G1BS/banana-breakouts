@@ -1,0 +1,6 @@
+# Raw daily exports — ignored by default (see README > On /data/)
+# Remove these two lines if you want to version your exports instead.
+data/*.csv
+data/*.xlsx
+
+.DS_Store
